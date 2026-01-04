@@ -47,7 +47,7 @@ That comes later.
 
 ---
 
-## System Relationship to Previous Weeks
+## System Relationship to Previous Repos
 
 This repository builds directly on:
 
