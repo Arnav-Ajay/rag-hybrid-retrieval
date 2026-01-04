@@ -1,5 +1,5 @@
 pdfplumber
-numpy
+pandas
 openai
 python-dotenv
-pandas
+numpy

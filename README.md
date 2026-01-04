@@ -1,74 +1,71 @@
-# `rag-retrieval-eval`
+# `rag-hybrid-retrieval`
 
 ## Why This Repository Exists
 
-[rag-minimal-control](https://github.com/Arnav-Ajay/rag-minimal-control) established a **minimal RAG control system** and showed that, under strict evidence constraints, the model consistently refused to answer.
+The previous repositories in this series established two facts:
 
-That refusal was *correct* — but **unexplained**.
+* A minimal RAG system can behave *correctly* and still refuse to answer
+* Most refusals are caused by **retrieval ranking failures**, not missing information
 
-This repository exists to answer a narrower and more fundamental question:
+However, one critical question remained unanswered:
 
-> **When a RAG system refuses to answer, is it because the answer is absent — or because retrieval failed?**
+> **Are these retrieval failures caused by semantic abstraction and low lexical overlap — and can sparse signals surface evidence that dense retrieval misses?**
 
-This is not an optimization repo.
-It is a **retrieval observability and evaluation harness**.
+This repository exists to answer **only that question**.
+
+This is not an optimization demo.
+It is a **controlled retrieval experiment**.
 
 ---
 
 ## What Problem This System Solves
 
-This system makes retrieval behavior:
+This repository tests whether **hybrid retrieval (dense + sparse)** improves **evidence surfacing** under the same constraints used in Week 2.
 
-* Observable
-* Measurable
-* Falsifiable
+Specifically, it asks:
 
-It allows a human to determine whether retrieval failures are due to:
+> *When dense retrieval ranks relevant evidence far below Top-K, does introducing sparse lexical signals move that evidence closer to the top — without changing generation behavior?*
 
-* Corpus absence
-* Representation collapse
-* Lexical bias
-* Ranking cutoff
-* Similarity score pathologies
-
-without changing the retrieval system itself.
+The focus is **retrieval-layer behavior only**.
 
 ---
 
 ## What This System Explicitly Does NOT Do
 
-This implementation deliberately avoids:
+This repository deliberately avoids:
 
+* Changing chunking strategy
 * Changing embedding models
-* Improving chunking strategies
-* Retrieval reranking
-* Semantic search
-* LLM-based grading
-* Answer correctness evaluation
-* Any attempt to “fix” retrieval
+* Retrieval reranking or learned fusion
+* Prompt engineering
+* LLM grading or answer correctness evaluation
+* Agent behavior or tool use
 
-If retrieval looks bad, that is the expected and desired outcome.
+If you are looking for a system that “answers better,” this is not it.
+
+That comes later.
 
 ---
 
-## System Relationship to rag-minimal-control
+## System Relationship to Previous Weeks
 
-This repository is behaviorally identical to `rag-minimal-control` with respect to retrieval and generation, with:
-* Identical corpus
-* Identical chunking
-* Identical embeddings
-* Identical similarity metric
-* Identical Top-K retrieval for generation
+This repository builds directly on:
 
-The **only difference** is the addition of retrieval observability.
+* [rag-minimal-control](https://github.com/Arnav-Ajay/rag-minimal-control)
+  A strict, minimal RAG control system
 
-`rag-minimal-control` answers:
+* [rag-retrieval-eval](https://github.com/Arnav-Ajay/rag-retrieval-eval)
+  A retrieval observability and evaluation harness
 
-> “Does the system behave correctly under constraint?”
+All `rag-retrieval-eval` components remain **frozen**, including:
 
-`rag-retrieval-eval` answers:
+* Corpus
+* Chunking
+* Embeddings
+* Dense similarity function
+* Top-K passed to the LLM (K = 4)
 
-> “Why does retrieval fail when answers exist?”
+The **only change** is the introduction of a sparse retriever and an explicit hybrid merge stage.
 
 ---
 
@@ -76,132 +73,149 @@ The **only difference** is the addition of retrieval observability.
 
 **Repo Contract:**
 
-* Inputs: same static PDF corpus as `rag-minimal-control`
+* Inputs: static PDF corpus (unchanged)
 * Query input: deterministic evaluation questions
 * Output:
 
-  * Ranked retrieval results (Top-N for inspection)
-  * Similarity scores
-  * Human relevance labels (external)
+  * Dense, sparse, and hybrid retrieval rankings
+  * Rank of first relevant chunk
+  * Top-K inclusion flags
 * Non-goal: generating correct answers
 
 ---
 
-## Retrieval Pipeline (Unchanged)
+## Retrieval Pipeline `rag-hybrid-retrieval`
 
 ```
-Document → Chunk → Embed → Retrieve → Rank → Top-K → Generate
+Document → Chunk → Embed
+                 ↘
+                  Dense Retriever +
+Query ───────────→ Sparse Retriever
+                     ↓
+                Explicit Hybrid Merge
+                     ↓
+                 Ranked Candidates
+                     ↓
+              Top-K → Generator (unchanged)
 ```
-
-**Important distinction:**
-
-* **Top-K (K=4)** → passed to the LLM (unchanged)
-* **Top-N (e.g., 20–50)** → logged for analysis only
 
 ---
 
-## What Is Being Measured
+## Dense vs Sparse Retrieval (Conceptual)
 
-This repository supports manual evaluation of:
+**Dense retrieval**
+
+* Uses embedding similarity
+* Captures semantic relationships
+* Rank reliability degrades quickly beyond a small neighborhood
+
+**Sparse retrieval (BM25)**
+
+* Uses exact lexical overlap
+* Excels at definitions, lists, and procedural text
+* Produces sharp but brittle signals
+
+Hybrid retrieval exists to test whether **lexical anchors can correct semantic misranking**.
+
+---
+
+## Hybrid Merge Logic (Explicit & Inspectable)
+
+This repository uses **rule-based hybrid merging**, not score fusion.
+
+Each chunk is annotated with:
+
+* Dense rank (if present)
+* Sparse rank (if present)
+
+Priority rules:
+
+1. Dense ≤ D **and** Sparse ≤ S
+2. Sparse ≤ S only
+3. Dense ≤ D only
+4. Otherwise → dropped
+
+Where:
+
+* **D** = dense trust threshold (semantic reliability window)
+* **S** = sparse trust threshold (lexical confidence window)
+
+These are **trust boundaries**, not tuning knobs.
+
+No reranking is performed.
+
+---
+
+## Evaluation Methodology (Unchanged from `rag-retrieval-eval`)
+
+All evaluation uses the **existing `rag-retrieval-eval` harness**.
+
+Metrics reported:
 
 * **Context Recall @ K**
 * **Rank of First Relevant Chunk**
-* **Retrieval Miss Rate**
-* **False Similarity Signals**
+* Dense vs Hybrid deltas (descriptive only)
 
-All relevance judgments are made by a human.
+Evaluation is stratified where possible by **question intent**:
 
-No automated scoring is used.
+* factual
+* rationale
+* scope / inventory
+
+No new metrics are introduced.
 
 ---
 
-## Expected Observations
+## Key Findings
 
-This system is expected to show:
+From the controlled experiment:
 
-* High similarity scores for semantically irrelevant chunks
-* Near-identical similarity values across many chunks
-* Relevant chunks appearing far below Top-K
-* Complete retrieval failure even when answers exist
+* Sparse retrieval frequently surfaces the gold (answer-bearing) chunk at very high rank
+* Hybrid retrieval consistently improves the **rank position** of relevant evidence compared to dense-only
+* However, without reranking, these gains **rarely translate into Top-K (K=4) inclusion**
 
-These observations are prerequisites for improvement — not failures to be corrected in this repository.
+**Interpretation:**
 
-These are not bugs.
-They are **diagnostic signals**.
+> Dense retrieval failures are often caused by lexical mismatch rather than missing corpus content.
+> Sparse signals successfully surface this evidence, but converting surfaced evidence into Top-K dominance requires a separate reranking stage.
+
 
 ---
 
 ## Why This Matters
 
-Most RAG systems fail silently.
+Most RAG systems conflate:
 
-By separating:
+* Evidence surfacing
+* Evidence ranking
+* Answer quality
 
-* **Retrieval failure**
-* **Corpus absence**
-* **Generation refusal**
+This repository separates them.
 
-this repository establishes a causal foundation for all future improvements.
+It shows that:
 
-No optimization is meaningful until failure is measured.
+* Hybrid retrieval can **expose hidden evidence**
+* But exposure alone is insufficient
+* Ranking must be treated as a first-class design problem
 
 ---
 
 ## How to Run
-- create a folder `data/` and add pdf files in it. (just 1 is fine)
-- create a .env file in root dir and add you OpenAI API key ket as: `OPENAI_API_KEY=<your-api-key>`
-- install dependencies: `pip install -r requirements.txt`
-- Run a Single Query (Baseline Behavior): This mirrors rag-minimal-control behavior and shows Top-K retrieval + refusal.
+
 ```bash
-  python app.py --query "What is the purpose of this document?"
+pip install -r requirements.txt
+python app.py --run-retrieval-eval --questions-csv data/retrieval_eval.csv
 ```
 
-## Retrieval Observability & Evaluation
-- Export Corpus Chunks (Debugging / Ground Truth Construction)
-  * Exports all chunks with document IDs to a CSV file.
-  ```bash
-  python app.py --export-chunks
-  ```
-  * Output: `data/chunks_debug.csv`
-  * This file is used to manually identify gold (answer-bearing) chunks.
+Outputs:
 
-- Run Corpus Diagnostics
-  * Prints document-level chunk counts and chunk → document mappings.
-  ```bash
-  python app.py --corpus-diag
-  ```
-- Run Retrieval Evaluation (Core Week-2 Artifact)
-  * Runs retrieval for a predefined question set and logs ranked results.
-  ```bash
-  python app.py --run-retrieval-eval --questions-csv data/retrieval_eval.csv
-  ```
-  * Output: `data/retrieval_evaluation_results.csv`
-  * This CSV is the primary evaluation artifact used for analysis.
+* `data/retrieval_evaluation_results_sanitized.csv`
+  - Row-level retrieval results (IDs + ranks only)
+* `data/summary_overall.csv`
+  - Aggregate retrieval metrics (overall)
+* `data/summary_by_intent.csv`
+  - Aggregate retrieval metrics stratified by question intent
 
-## Command-Line Arguments
-  * `--query`: Run a single retrieval + generation query
-  * `--export-chunks`: Export all chunks to CSV
-  * `--corpus-diag`: Print corpus diagnostics
-  * `--run-retrieval-eval`: Run retrieval evaluation harness
-  * `--questions-csv`: Path to evaluation question file
-
-## Text Normalization Note
-
-PDF text extraction exhibited common mojibake artifacts
-(e.g., mis-decoded dashes, arrows, and mathematical symbols).
-
-These were corrected using deterministic Unicode normalization
-and explicit glyph replacement. No semantic rewriting or
-content alteration was performed.
-
-## Evaluation Artifacts
-
-This repository produces a structured evaluation table containing:
-
-- Question
-- Gold (human-identified) chunk ID
-- Ranked retrieved chunk IDs
-- Rank of first relevant chunk
-- Whether the relevant chunk appears in Top-K
-
-This table is the primary diagnostic output of the system.
+These artifacts constitute the complete Week-3 evaluation surface.
+Published evaluation artifacts exclude document and chunk text to avoid
+distributing source content; only rank-based retrieval metrics are included.
