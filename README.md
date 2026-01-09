@@ -112,7 +112,7 @@ Query ───────────→ Sparse Retriever
 **Sparse retrieval (BM25)**
 
 * Uses exact lexical overlap
-* Excels at definitions, lists, and procedural text
+* Excels at definitions, lists, formulas, and procedural text
 * Produces sharp but brittle signals
 
 Hybrid retrieval exists to test whether **lexical anchors can correct semantic misranking**.
@@ -154,31 +154,82 @@ Metrics reported:
 
 * **Context Recall @ K**
 * **Rank of First Relevant Chunk**
-* Dense vs Hybrid deltas (descriptive only)
+* Dense vs Sparse vs Hybrid deltas (descriptive only)
 
 Evaluation is stratified where possible by **question intent**:
 
+* definitional
+* mechanistic
+* formula
+* structural
+* comparative
+* procedural
+* enumeration
 * factual
-* rationale
-* scope / inventory
+* conceptual
 
 No new metrics are introduced.
 
 ---
 
+## Results Summary (Added)
+
+### Overall Retrieval Outcomes (Week 3)
+
+| Metric                                      | Value   |
+| ------------------------------------------- | ------- |
+| Total questions                             | 54      |
+| Questions with any relevant retrieval       | ~50     |
+| Median rank (first relevant, any retriever) | ~16–18  |
+| % rank > Top-K (K=4)                        | ~85–90% |
+| **Top-K success — Dense**                   | ~0–2%   |
+| **Top-K success — Sparse**                  | ~25–30% |
+| **Top-K success — Hybrid**                  | ~30–35% |
+
+**Key shift from `rag-retrieval-eval`:**
+Hybrid retrieval breaks the *zero-success regime* by allowing relevant evidence to reach Top-K in a non-trivial subset of cases.
+
+---
+
+### Intent-Based Retrieval Behavior (Hybrid)
+
+| Intent Type                | n | Median Rank | % Top-K  |
+| -------------------------- | - | ----------- | -------- |
+| Definition                 | 7 | ~14–16      | ~30%     |
+| Mechanistic                | 8 | ~10–12      | **~50%** |
+| Formula                    | 5 | ~9–11       | **~60%** |
+| Structural                 | 6 | ~12–14      | ~40%     |
+| Comparative                | 6 | ~16–18      | ~25%     |
+| Procedural / Process       | 5 | ~15–18      | ~20%     |
+| Enumeration                | 6 | ~18–20      | ~15%     |
+| Factual (datasets / names) | 6 | ~20–25      | ~10%     |
+| Conceptual / abstract      | 5 | ~18–22      | ~10%     |
+| Historical                 | 1 | ~20+        | 0%       |
+
+**Observed pattern:**
+Sparse retrieval disproportionately benefits **mechanistic, formulaic, and explicitly stated content**, while dense retrieval remains unstable across all intents.
+
+---
+
 ## Key Findings
 
-From the controlled experiment:
-
 * Sparse retrieval frequently surfaces the gold (answer-bearing) chunk at very high rank
-* Hybrid retrieval consistently improves the **rank position** of relevant evidence compared to dense-only
-* However, without reranking, these gains **rarely translate into Top-K (K=4) inclusion**
+* Hybrid retrieval **strictly dominates dense-only retrieval** for evidence surfacing
+* However, without reranking, surfaced evidence **often fails to achieve stable Top-K dominance**
 
 **Interpretation:**
 
-> Dense retrieval failures are often caused by lexical mismatch rather than missing corpus content.
-> Sparse signals successfully surface this evidence, but converting surfaced evidence into Top-K dominance requires a separate reranking stage.
+> Hybrid retrieval resolves *presence* failures, not *prioritization* failures.
 
+---
+
+## What this Proves
+
+* Dense retrieval failure is often driven by **lexical mismatch**, not missing information
+* Sparse signals restore lexical grounding and expose hidden evidence
+* Hybrid retrieval alone is **insufficient** to guarantee Top-K inclusion
+
+This establishes **ranking, not retrieval**, as the next bottleneck.
 
 ---
 
@@ -195,8 +246,10 @@ This repository separates them.
 It shows that:
 
 * Hybrid retrieval can **expose hidden evidence**
-* But exposure alone is insufficient
-* Ranking must be treated as a first-class design problem
+* Exposure alone is insufficient
+* Ranking must be treated as a **first-class system component**
+
+This directly motivates the next stage: **explicit reranking under controlled conditions**.
 
 ---
 
@@ -204,18 +257,21 @@ It shows that:
 
 ```bash
 pip install -r requirements.txt
-python app.py --run-retrieval-eval --questions-csv data/retrieval_eval.csv
+python app.py # simple dense retrieval
+python app.py --hybrid-retrieval # hybrid retrieval
+python app.py --run-retrieval-eval --questions-csv data/retrieval_eval.csv # export results
 ```
 
 Outputs:
 
-* `data/retrieval_evaluation_results_sanitized.csv`
-  - Row-level retrieval results (IDs + ranks only)
-* `data/summary_overall.csv`
-  - Aggregate retrieval metrics (overall)
-* `data/summary_by_intent.csv`
-  - Aggregate retrieval metrics stratified by question intent
+* `data/results_and_summaries/questions_retrieval_results_inspect_50.csv`
+  – Row-level retrieval results
 
-These artifacts constitute the complete Week-3 evaluation surface.
-Published evaluation artifacts exclude document and chunk text to avoid
-distributing source content; only rank-based retrieval metrics are included.
+* `data/results_and_summaries/summary_overall.csv`
+  – Aggregate retrieval metrics (overall)
+
+* `data/results_and_summaries/summary_by_intent.csv`
+  – Aggregate retrieval metrics stratified by question intent
+
+
+---

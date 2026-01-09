@@ -1,6 +1,7 @@
 # retriever.py → embeddings + top-K
 import re
 import math
+from typing_extensions import final
 import numpy as np
 from collections import Counter, defaultdict
 
@@ -204,7 +205,9 @@ def hybrid_retriever(query, vector_store, bm25_index,
         dr_t = dr if dr is not None else 10**9
         sr_t = sr if sr is not None else 10**9
 
+        info["priority"] = priority
         final.append((priority, dr_t, sr_t, chunk_id, info))
+
 
     final.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
 
@@ -215,7 +218,7 @@ def hybrid_retriever(query, vector_store, bm25_index,
         # Hybrid "score" is not a similarity score.
         # We expose retrieval provenance instead.
         hybrid_score = {
-            "priority": priority,
+            "priority": info["priority"],
             "dense_rank": info["dense_rank"],
             "sparse_rank": info["sparse_rank"]
         }
