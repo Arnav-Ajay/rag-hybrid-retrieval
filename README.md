@@ -20,7 +20,7 @@ It is a **controlled retrieval experiment**.
 
 ## What Problem This System Solves
 
-This repository tests whether **hybrid retrieval (dense + sparse)** improves **evidence surfacing** under the same constraints used in Week 2.
+This repository tests whether **hybrid retrieval (dense + sparse)** improves **evidence surfacing** under the same constraints used in `rag-retrieval-eval`.
 
 Specifically, it asks:
 
@@ -172,9 +172,9 @@ No new metrics are introduced.
 
 ---
 
-## Results Summary (Added)
+## Results Summary 
 
-### Overall Retrieval Outcomes (Week 3)
+### Overall Retrieval Outcomes 
 
 | Metric                                      | Value   |
 | ------------------------------------------- | ------- |
