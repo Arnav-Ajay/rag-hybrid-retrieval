@@ -49,9 +49,9 @@ def retrieve_similar_documents(vector_store, query, top_k=4):
 
     return similarities[:top_k]
 
-# -------------------------
-# Sparse (BM25) — Week 3
-# -------------------------
+# -------------
+# Sparse (BM25)
+# -------------
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 def tokenize(text: str):

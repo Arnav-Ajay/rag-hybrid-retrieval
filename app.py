@@ -79,7 +79,7 @@ def run_retrieval_evaluation(args, vector_store, bm25_index, inspect_k=50):
             "gold_chunk_id": gold_chunk_id,
             "gold_doc_id": gold_doc_id,
 
-            # Dense (Week-2 metrics)
+            # Dense
             "retrieved_chunk_ids_dense": "|".join(map(str, dense_ids)),
             "rank_of_first_relevant_dense": rank_of_gold(dense_ids),
             "retrieved_in_top_k_dense": in_top_k(dense_ids, k=4),
@@ -87,7 +87,7 @@ def run_retrieval_evaluation(args, vector_store, bm25_index, inspect_k=50):
             "notes": row.get("notes", "")
         }
 
-        # Sparse (Week-3 comparison)
+        # Sparse
         if sparse_ids is not None:
             result.update({
                 "retrieved_chunk_ids_sparse": "|".join(map(str, sparse_ids)),
@@ -95,7 +95,7 @@ def run_retrieval_evaluation(args, vector_store, bm25_index, inspect_k=50):
                 "retrieved_in_top_k_sparse": in_top_k(sparse_ids, k=4),
             })
 
-        # Hybrid (Week-3 comparison)
+        # Hybrid
         if hybrid_ids is not None:
             result.update({
                 "retrieved_chunk_ids_hybrid": "|".join(map(str, hybrid_ids)),
